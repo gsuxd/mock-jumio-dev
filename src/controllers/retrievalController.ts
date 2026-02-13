@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import db from '../config/database';
-import { generateMockVerificationResult } from '../services/mockDataService';
+import { Request, Response } from "express";
+import db from "../config/database";
+import { generateMockVerificationResult } from "../services/mockDataService";
 
 export class RetrievalController {
   // GET /api/v1/accounts/:accountId/workflow-executions/:workflowExecutionId
@@ -19,37 +19,39 @@ export class RetrievalController {
           (err, row) => {
             if (err) reject(err);
             else resolve(row);
-          }
+          },
         );
       });
 
       if (!workflowExecution) {
         res.status(404).json({
-          error: 'not_found',
-          message: 'Workflow execution not found'
+          error: "not_found",
+          message: "Workflow execution not found",
         });
         return;
       }
 
-      // Generate mock verification result based on user_reference (email)
-      const result = generateMockVerificationResult(
-        workflowExecution.user_reference,
-        accountId
-      );
+      // Import the progressive result generator
+      const { generateProgressiveWorkflowResult } =
+        await import("../services/mockDataService");
 
-      // Update result with actual IDs from database
-      result.account.id = accountId;
-      result.workflowExecution.id = workflowExecutionId;
-      result.workflowExecution.startedAt = workflowExecution.created_at;
-      result.workflowExecution.completedAt = workflowExecution.completed_at || new Date().toISOString();
+      // Generate progressive result based on time elapsed
+      const result = generateProgressiveWorkflowResult(
+        workflowExecution.user_reference,
+        accountId,
+        workflowExecutionId,
+        workflowExecution.created_at,
+        workflowExecution.completed_at,
+        workflowExecution.user_reference,
+      );
 
       res.json(result);
     } catch (error) {
-      console.error('Error retrieving workflow results:', error);
+      console.error("Error retrieving workflow results:", error);
       res.status(500).json({
-        error: 'server_error',
-        message: 'Failed to retrieve workflow results',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: "server_error",
+        message: "Failed to retrieve workflow results",
+        details: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
@@ -60,16 +62,20 @@ export class RetrievalController {
       const { accountId } = req.params;
 
       const account = await new Promise<any>((resolve, reject) => {
-        db.get('SELECT * FROM accounts WHERE id = ?', [accountId], (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        });
+        db.get(
+          "SELECT * FROM accounts WHERE id = ?",
+          [accountId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          },
+        );
       });
 
       if (!account) {
         res.status(404).json({
-          error: 'not_found',
-          message: 'Account not found'
+          error: "not_found",
+          message: "Account not found",
         });
         return;
       }
@@ -77,12 +83,12 @@ export class RetrievalController {
       // Get workflow executions for this account
       const workflowExecutions = await new Promise<any[]>((resolve, reject) => {
         db.all(
-          'SELECT * FROM workflow_executions WHERE account_id = ? ORDER BY created_at DESC',
+          "SELECT * FROM workflow_executions WHERE account_id = ? ORDER BY created_at DESC",
           [accountId],
           (err, rows) => {
             if (err) reject(err);
             else resolve(rows || []);
-          }
+          },
         );
       });
 
@@ -92,19 +98,19 @@ export class RetrievalController {
         userReference: account.user_reference,
         workflowDefinitionKey: account.workflow_definition_key,
         createdAt: account.created_at,
-        workflowExecutions: workflowExecutions.map(we => ({
+        workflowExecutions: workflowExecutions.map((we) => ({
           id: we.id,
           status: we.status,
           createdAt: we.created_at,
-          completedAt: we.completed_at
-        }))
+          completedAt: we.completed_at,
+        })),
       });
     } catch (error) {
-      console.error('Error retrieving account:', error);
+      console.error("Error retrieving account:", error);
       res.status(500).json({
-        error: 'server_error',
-        message: 'Failed to retrieve account',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: "server_error",
+        message: "Failed to retrieve account",
+        details: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }

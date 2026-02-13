@@ -191,6 +191,96 @@ Authorization: Bearer <access_token>
 }
 ```
 
+### 4. Workflow State Progression
+
+The mock server emulates realistic workflow state progression based on the `CALLBACK_DELAY_MS` configuration:
+
+```bash
+GET /api/v1/accounts/{accountId}/workflow-executions/{workflowExecutionId}
+Authorization: Bearer <access_token>
+```
+
+**State Timeline** (with default `CALLBACK_DELAY_MS=2000`):
+
+| Time Since Creation     | Status       | Description                          |
+| ----------------------- | ------------ | ------------------------------------ |
+| 0 - 1000ms (0-50%)      | `INITIATED`  | Workflow created, not yet processing |
+| 1000 - 2000ms (50-100%) | `PROCESSING` | Actively processing verification     |
+| 2000ms+ (100%+)         | `PROCESSED`  | Complete with full results           |
+
+**INITIATED Response:**
+
+```json
+{
+  "timestamp": "2026-02-13T19:43:00.000Z",
+  "account": { "id": "acc_..." },
+  "workflowExecution": {
+    "id": "wfe_...",
+    "status": "INITIATED",
+    "definition": {
+      "key": "10164",
+      "name": "ID + Selfie Verification"
+    },
+    "startedAt": "2026-02-13T19:43:00.000Z"
+  }
+}
+```
+
+**PROCESSING Response:**
+
+```json
+{
+  "timestamp": "2026-02-13T19:43:01.500Z",
+  "account": { "id": "acc_..." },
+  "workflowExecution": {
+    "id": "wfe_...",
+    "status": "PROCESSING",
+    "definition": {
+      "key": "10164",
+      "name": "ID + Selfie Verification"
+    },
+    "startedAt": "2026-02-13T19:43:00.000Z"
+  }
+}
+```
+
+**PROCESSED Response** (Full result with capabilities):
+
+```json
+{
+  "timestamp": "2026-02-13T19:43:02.500Z",
+  "account": { "id": "acc_..." },
+  "workflowExecution": {
+    "id": "wfe_...",
+    "status": "PROCESSED",
+    "definition": {
+      "key": "10164",
+      "name": "ID + Selfie Verification"
+    },
+    "startedAt": "2026-02-13T19:43:00.000Z",
+    "completedAt": "2026-02-13T19:43:02.500Z"
+  },
+  "decision": {
+    "type": "ACCEPTED",
+    "details": { "label": "OK" }
+  },
+  "capabilities": {
+    "extraction": {
+      /* document data */
+    },
+    "similarity": {
+      /* similarity scores */
+    },
+    "liveness": {
+      /* liveness scores */
+    },
+    "authentication": {
+      /* authentication scores */
+    }
+  }
+}
+```
+
 ## 🎭 Email Patterns
 
 The mock server returns different verification results based on the `userReference` email:

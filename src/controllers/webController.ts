@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
-import db from '../config/database';
-import { getVerificationStatusFromEmail } from '../services/mockDataService';
+import { Request, Response } from "express";
+import path from "path";
+import fs from "fs";
+import db from "../config/database";
+import { getVerificationStatusFromEmail } from "../services/mockDataService";
 
 export class WebController {
   // GET /workflow/:workflowExecutionId - Serve hosted interface
@@ -13,26 +13,26 @@ export class WebController {
       // Verify workflow exists
       const workflow = await new Promise<any>((resolve, reject) => {
         db.get(
-          'SELECT * FROM workflow_executions WHERE id = ?',
+          "SELECT * FROM workflow_executions WHERE id = ?",
           [workflowExecutionId],
           (err, row) => {
             if (err) reject(err);
             else resolve(row);
-          }
+          },
         );
       });
 
       if (!workflow) {
-        res.status(404).send('<h1>Workflow not found</h1>');
+        res.status(404).send("<h1>Workflow not found</h1>");
         return;
       }
 
       // Serve the HTML file
-      const htmlPath = path.join(__dirname, '../views/workflow.html');
+      const htmlPath = path.join(__dirname, "../views/workflow.html");
       res.sendFile(htmlPath);
     } catch (error) {
-      console.error('Error serving workflow:', error);
-      res.status(500).send('<h1>Error loading verification page</h1>');
+      console.error("Error serving workflow:", error);
+      res.status(500).send("<h1>Error loading verification page</h1>");
     }
   }
 
@@ -53,73 +53,85 @@ export class WebController {
           (err, row) => {
             if (err) reject(err);
             else resolve(row);
-          }
+          },
         );
       });
 
       if (!workflow) {
         res.status(404).json({
-          status: 'error',
-          message: 'Workflow not found'
+          status: "error",
+          message: "Workflow not found",
         });
         return;
       }
 
       // Determine verification result based on email
-      const verificationStatus = getVerificationStatusFromEmail(workflow.user_reference);
-      const isApproved = verificationStatus === 'APPROVED_VERIFIED';
+      const verificationStatus = getVerificationStatusFromEmail(
+        workflow.user_reference,
+      );
+      const isApproved = verificationStatus === "APPROVED_VERIFIED";
 
-      // Update workflow status
+      // Update workflow status to PROCESSED (Jumio's official completion status)
       await new Promise<void>((resolve, reject) => {
         db.run(
           `UPDATE workflow_executions 
-           SET status = ?, completed_at = CURRENT_TIMESTAMP 
+           SET status = 'PROCESSED', completed_at = CURRENT_TIMESTAMP 
            WHERE id = ?`,
-          [verificationStatus, workflowExecutionId],
+          [workflowExecutionId],
           (err) => {
             if (err) reject(err);
             else resolve();
-          }
+          },
         );
       });
 
       // Simulate callback if URL is provided
       if (workflow.callback_url) {
-        setTimeout(async () => {
-          try {
-            const callbackPayload = {
-              timestamp: new Date().toISOString(),
-              account: {
-                id: workflow.account_id
-              },
-              workflowExecution: {
-                id: workflowExecutionId,
-                status: verificationStatus
-              }
-            };
+        setTimeout(
+          async () => {
+            try {
+              const callbackPayload = {
+                timestamp: new Date().toISOString(),
+                account: {
+                  id: workflow.account_id,
+                },
+                workflowExecution: {
+                  id: workflowExecutionId,
+                  status: verificationStatus,
+                },
+              };
 
-            // In a real implementation, you would send an HTTP POST to callback_url
-            console.log('Callback would be sent to:', workflow.callback_url);
-            console.log('Callback payload:', JSON.stringify(callbackPayload, null, 2));
-          } catch (error) {
-            console.error('Error sending callback:', error);
-          }
-        }, parseInt(process.env.CALLBACK_DELAY_MS || '2000'));
+              // In a real implementation, you would send an HTTP POST to callback_url
+              console.log("Callback would be sent to:", workflow.callback_url);
+              console.log(
+                "Callback payload:",
+                JSON.stringify(callbackPayload, null, 2),
+              );
+            } catch (error) {
+              console.error("Error sending callback:", error);
+            }
+          },
+          parseInt(process.env.CALLBACK_DELAY_MS || "2000"),
+        );
       }
 
       // Return response with redirect URLs
       res.json({
-        status: isApproved ? 'success' : 'error',
+        status: isApproved ? "success" : "error",
         verificationStatus: verificationStatus,
-        successUrl: workflow.success_url || `${process.env.BASE_URL || 'http://localhost:3000'}/success`,
-        errorUrl: workflow.error_url || `${process.env.BASE_URL || 'http://localhost:3000'}/error`
+        successUrl:
+          workflow.success_url ||
+          `${process.env.BASE_URL || "http://localhost:3000"}/success`,
+        errorUrl:
+          workflow.error_url ||
+          `${process.env.BASE_URL || "http://localhost:3000"}/error`,
       });
     } catch (error) {
-      console.error('Error submitting workflow:', error);
+      console.error("Error submitting workflow:", error);
       res.status(500).json({
-        status: 'error',
-        message: 'Failed to process workflow',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        status: "error",
+        message: "Failed to process workflow",
+        details: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
